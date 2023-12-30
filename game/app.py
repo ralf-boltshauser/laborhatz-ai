@@ -1,4 +1,6 @@
 import multiprocessing
+import os
+import pickle
 import time
 
 import neat
@@ -7,20 +9,15 @@ import pygame
 import tensorflow as tf
 from labyrinth import Labyrinth
 
-# Initialize Pygame
-pygame.init()
-
 # Constants
-WIDTH, HEIGHT = 600, 800
-TILE_SIZE = WIDTH // 5
+WIDTH, HEIGHT = 1600, 1000
+TILE_SIZE = WIDTH // 16
 BACKGROUND_COLOR_RUNNABLE = (255, 255, 255)
 BACKGROUND_COLOR_OBSTACLE = (0, 0, 0)
 SEEKER_COLOR = (255, 0, 0)  # Red
 RUNNER_COLOR = (0, 0, 255)  # Blue
 
-# Setup the display
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Labyrinth Game")
+screen = None
 
 # Function to draw the grid
 def draw_grid(grid):
@@ -39,12 +36,17 @@ def draw_players(seekers, runner):
     
     pygame.draw.circle(screen, RUNNER_COLOR, (runner.position[1] * TILE_SIZE + TILE_SIZE // 2, runner.position[0] * TILE_SIZE + TILE_SIZE // 2), TILE_SIZE // 4)
 
-# Load configuration.
-config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                     neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                     'config-feedforward.cfg')
 
 def main(show, net):
+    global screen
+    # Initialize Pygame
+    pygame.init()
+
+
+    # Setup the display
+    if show:
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("Labyrinth Game")
     labyrinth = Labyrinth()
     clock = pygame.time.Clock()
 
@@ -69,8 +71,8 @@ def main(show, net):
             elif output[i * 4 + 3] > 0.5:
                 labyrinth.seekers[i].move(labyrinth.grid, [0, 1])
       
-        if (steps % 10):
-           labyrinth.runner.move(labyrinth.grid, [0, -1])
+        # if (steps % 10):
+        #    labyrinth.runner.move(labyrinth.grid, [0, -1])
 
         # if (steps == 30 or labyrinth.shortest_distance_to_runner() == 0):
         if (steps == 30):
@@ -81,39 +83,83 @@ def main(show, net):
           draw_players(labyrinth.seekers, labyrinth.runner)
 
           pygame.display.flip()
-          clock.tick(2)
+          clock.tick(5)
         steps += 1
 
     return labyrinth.fitness(steps)
 
 
 
-# Define the fitness function.
+# Multiprocessing
+# # Define the fitness function.
+# def eval_genome(genome_id, genome, config):
+#     net = neat.nn.FeedForwardNetwork.create(genome, config)
+#     return genome_id, main(False, net)  # Assuming 'False' means no GUI display
+
+# def eval_genomes(genomes, config):
+#     pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())  # Pool of worker processes
+#     results = pool.starmap(eval_genome, [(genome_id, genome, config) for genome_id, genome in genomes])
+   
+#     # Close the pool properly
+#     pool.close()
+#     pool.join() 
+#     # Apply the fitness back to each genome
+#     # set all genomes to have a fitness of 0
+#     for genome_id, genome in genomes:
+#         genome.fitness = 0
+#     for genome_id, fitness in results:
+#         try:
+#             genomes[genome_id % 500][1].fitness = fitness
+#             print(f"Genome {genome_id % 500} fitness: {fitness}")
+#         except:
+#             print(f"Genome {genome_id % 500} fitness: {fitness} failed")
+
+
+# Single process
+def eval_genome(genome, config):
+    net = neat.nn.FeedForwardNetwork.create(genome, config)
+    return main(False, net)  # Assuming 'False' means no GUI display
+
 def eval_genomes(genomes, config):
     for genome_id, genome in genomes:
-        net = neat.nn.FeedForwardNetwork.create(genome, config)
-        genome.fitness = main(False, net)
+        genome.fitness = eval_genome(genome, config)
+        # print(f"Genome {genome_id % 500} fitness: {genome.fitness}")
 
 
-# Create the population, which is the top-level object for a NEAT run.
-p = neat.Population(config)
+if __name__ == "__main__":
+    # Load configuration.
+    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                        neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                        'config-feedforward.cfg')
+    filename = 'winner.pkl'
 
-# Add a stdout reporter to show progress in the terminal.
-p.add_reporter(neat.StdOutReporter(True))
-stats = neat.StatisticsReporter()
-p.add_reporter(stats)
+    if os.path.exists(filename):
+        with open(filename, 'rb') as input:
+            winner = pickle.load(input)
+            # Now you can use the 'winner' object
+            print("Loaded winner successfully.")
+    else:
+        print(f"File {filename} does not exist.")
+        # Create the population, which is the top-level object for a NEAT run.
+        p = neat.Population(config)
 
-# Run NEAT.
-winner = p.run(eval_genomes, 50)  # Run for up to 50 generations.
+        # Add a stdout reporter to show progress in the terminal.
+        p.add_reporter(neat.StdOutReporter(True))
+        stats = neat.StatisticsReporter()
+        p.add_reporter(stats)
 
-# Display the winning genome.
-print('\nBest genome:\n{!s}'.format(winner))
+        # Run NEAT.
+        winner = p.run(eval_genomes, 50)  # Run for up to 50 generations.
 
-main(True, neat.nn.FeedForwardNetwork.create(winner, config))
+        # Assuming 'winner' is your winning genome
+        with open('winner.pkl', 'wb') as output:
+            pickle.dump(winner, output, 1)
 
 
 
-# if __name__ == "__main__":
-#     main()
+    # Display the winning genome.
+    print('\nBest genome:\n{!s}'.format(winner))
 
-time.sleep(5)
+    main(True, neat.nn.FeedForwardNetwork.create(winner, config))
+
+    time.sleep(5)
