@@ -17,6 +17,7 @@ Markdown==3.5.1
 MarkupSafe==2.1.3
 ml-dtypes==0.2.0
 neat-python==0.92
+networkx==3.2.1
 numpy==1.26.2
 oauthlib==3.2.2
 opt-einsum==3.3.0
