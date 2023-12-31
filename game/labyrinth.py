@@ -20,7 +20,7 @@ class Labyrinth:
       # [1,0,1,0,1,1,0,1,0,0,0,1,0,1,0,1],
       # [1,1,1,0,0,1,1,1,1,1,1,1,0,1,1,1]
     ])
-    self.seekers = [Seeker([1,0], 0), Seeker([1,11], 1)]
+    self.seekers = [Seeker([1,0], 0), Seeker([2,0], 1)]
     self.runner = Runner([2,7])
     # used for library
     self.graph = self.create_graph_from_grid()
@@ -96,7 +96,7 @@ class Labyrinth:
     # if self.check_and_punish_bad_move():
     #   return min(1/self.shortest_distance_to_runner(), 4) / 2 + 0.1/steps
     #  min(1/self.shortest_distance_to_runner(), 0) +
-    return 0.1/steps + min(4 / (self.tiles_reachable_by_runner() + 1), 4)
+    return 0.1/steps + min(4 / (self.tiles_reachable_by_runner() + 2), 4)
 
   def check_and_punish_bad_move(self):
     for seeker in self.seekers:
